@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>WebGL 기본</title>
+
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      .main {
+        width: 100%;
+        height: 100vh;
+
+        background-color: rgba(0, 0, 0, 0.2);
+
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+
+      #c {
+        background-color: rgba(255, 20, 147, 0.2);
+      }
+    </style>
+  </head>
+  
+  <body>
+    <main class="main">
+      <canvas id="c"></canvas>
+    </main>
+
+    <!-- Vertex Shader Source -->
+    <!-- type="x-shader/x-vertex" 로 사용 (동작 확인 필요) -->
+    <script id="vertex-shader-2d" type="notjs">
+      attribute vec4 a_position;
+
+      void main() {
+        // gl_Position은 Vertex Shader가 담당하는 설정의 특수 변수
+        gl_Position = a_position;
+      }
+    </script>
+
+    <!-- Fragment Shader Source -->
+    <!-- type="x-shader/x-fragment" 로 사용 (동작 확인 필요) -->
+    <script id="fragment-shader-2d" type="notjs">
+      precision mediump float;
+
+      void main() {
+        // gl_FragColor는 Fragment Shader가 담당하는 설정의 특수 변수
+        gl_FragColor = vec4(1, 0, 0.5, 1);
+      }
+    </script>
+
+    <script>
+      const canvas = document.querySelector("#c");
+      const gl = canvas.getContext("webgl");
+
+      if(!gl) {
+        alert("WebGL 객체가 생성되지 않았음");
+      }
+
+      // Shader 생성 함수
+      function createShader(gl, type, source) {
+        const shader = gl.createShader(type);
+        gl.shaderSource(shader, source);
+        gl.compileShader(shader);
+
+        const success = gl.getShaderParameter(shader, gl.COMPILE_STATUS);
+        if(success) {
+          console.log("success: ", success);
+          return shader;
+        } else {
+          console.log(gl.getShaderInfoLog(shader));
+          gl.deleteShader(shader);
+        }
+      }
+
+      // Program 생성 함수
+      function createProgram(gl, vertexShader, fragmentShader) {
+        // Program 객체 생성
+        const program = gl.createProgram();
+        // Program에 VertexShader 붙이기
+        gl.attachShader(program, vertexShader);
+        // Program에 FragmentShader 붙이기
+        gl.attachShader(program, fragmentShader);
+        // WebGL에 Program 연결
+        gl.linkProgram(program);
+
+        // WebGL에 연결한 Program객체 반환하기
+        const success = gl.getProgramParameter(program, gl.LINK_STATUS);
+
+        if(success) {
+          return program;
+        }
+
+        console.log("Program 생성 실패");
+        gl.deleteProgram(program);
+      }
+
+      const vertexShaderSource = document.querySelector("#vertex-shader-2d").text;
+      const fragmentShaderSource = document.querySelector("#fragment-shader-2d").text;
+
+      // VertexShader 객체 생성
+      const vertexShader = createShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
+      // FragmentShader 객체 생성
+      const fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, fragmentShaderSource);
+      // Program 객체 생성
+      const program = createProgram(gl, vertexShader, fragmentShader);
+
+      // Program에 데이터를 입력하기 위해, Program에 있는 a_position의 ``참조주소`` 가져오기
+      const positionAttributeLocation = gl.getAttribLocation(program, "a_position");
+      // Attribute는 Buffer에서 데이터를 전달받게 되므로, Buffer를 생성 및 연결
+      const positionBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+
+      // 2D Point 3개
+      const positions = [
+        0, 0,
+        0, 0.5,
+        0.7, 0,
+      ];
+
+      gl.bufferData(
+        gl.ARRAY_BUFFER,
+        new Float32Array(positions),
+        gl.STATIC_DRAW,
+      );
+
+      // Canvas의 Pixel수를 실제 화면에 출력할 크기로 맞추기
+      function resizeCanvasToDisplaySize(canvas) {
+        const displayWidth = canvas.clientWidth;
+        const displayHeight = canvas.clientHeight;
+
+        const needResize = 
+            displayWidth !== canvas.width ||
+            displayHeight !== canvas.height;
+
+        if(needResize) {
+          canvas.width = displayWidth;
+          canvas.height = displayHeight;
+        }
+      }
+      resizeCanvasToDisplaySize(gl.canvas);
+      
+      // Clip Space를 Screen Space와 동기화
+      // Clip Space: (-1, -1) ~ (1, 1)
+      gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+
+      // Canvas 지우기
+      gl.clearColor(0, 0, 0, 0);
+      // gl.clearColor()로 설정한 색상값으로 지우기(마스킹) 실행
+      gl.clear(gl.COLOR_BUFFER_BIT);
+
+      // WebGL에 실행할 Shader Program 알리기
+      gl.useProgram(program);
+
+      // Vertex Shader의 Attribute 활성화
+      gl.enableVertexAttribArray(positionAttributeLocation);
+
+      // Buffer에서 데이터를 꺼내는 방법 설정
+      // 2개씩 꺼내기
+      const size = 2;
+      // 데이터 타입은 32bit Float형
+      const type = gl.FLOAT;
+      // 데이터 정규화 안함
+      const normalize = false;
+      // 데이터를 꺼내는 단위 크기 (보폭)
+      const stribe = 0;
+      // Buffer의 시작점
+      const offset = 0;
+      // 위에 설정한 방법을 Buffer에 적용 및 attribute에 Buffer 바인딩
+      gl.vertexAttribPointer(
+        positionAttributeLocation,
+        size,
+        type,
+        normalize,
+        stribe,
+        offset,
+      );
+
+      // 삼각형 그리기
+      const primitiveType = gl.TRIANGLES;
+      const drawingOffset = 0;
+      const drawingCount = 4;
+      gl.drawArrays(primitiveType, drawingOffset, drawingCount);
+    </script>
+  </body>
+</html>
